@@ -21,12 +21,12 @@ A live-updating terminal dashboard that displays the current time, day progress,
 ╔════════════════════════════════════════════════════════╗
 ║       TIMEZONE DASHBOARD         Friday, Apr 18       ║
 ╠════════════════════════════════════════════════════════╣
-║  HAWAII       1:45  ░░░░░░░░░░░░░░  ☀️  79°F Sunny   ║
-║  WEST COAST   4:45  ▓▓▓▓▓░░░░░░░░░  ⛅ 68°F Cloudy   ║
-║  MOUNTAIN     5:45  ▓▓▓▓▓▓░░░░░░░░  🌤️  72°F Clear   ║
-║ ►CENTRAL      6:45  ▓▓▓▓▓▓▓░░░░░░░  🌧️  65°F Rain    ║
-║  EASTERN      7:45  ▓▓▓▓▓▓▓▓░░░░░░  ☁️  61°F Cloudy  ║
-║  UTC         12:45  ▓▓▓▓▓▓▓▓▓▓▓░░░  🌙 52°F Clear    ║
+║  HAWAII       1:45  ░░░░░░░░░░░░░░  ☀️  79°F/26°C Sunny   ║
+║  WEST COAST   4:45  ▓▓▓▓▓░░░░░░░░░  ⛅ 68°F/20°C Cloudy  ║
+║  MOUNTAIN     5:45  ▓▓▓▓▓▓░░░░░░░░  🌤️  72°F/22°C Clear   ║
+║ ►CENTRAL      6:45  ▓▓▓▓▓▓▓░░░░░░░  🌧️  65°F/18°C Rain    ║
+║  EASTERN      7:45  ▓▓▓▓▓▓▓▓░░░░░░  ☁️  61°F/16°C Cloudy  ║
+║  UTC         12:45  ▓▓▓▓▓▓▓▓▓▓▓░░░  🌙 52°F/11°C Clear    ║
 ╠════════════════════════════════════════════════════════╣
 ║  r: refresh weather   q: quit   weather updated 2m ago║
 ╚════════════════════════════════════════════════════════╝
@@ -36,7 +36,7 @@ A live-updating terminal dashboard that displays the current time, day progress,
 
 - **Frame**: Unicode box-drawing characters (`╔ ═ ╗ ║ ╚ ╝ ╠ ╣`), blue color
 - **Header**: Title + day of week and date, based on the home timezone (Central)
-- **Zone rows**: Label, time (no AM/PM — progress bar conveys this), 24h progress bar, emoji weather icon, temperature (°F), short condition text
+- **Zone rows**: Label, time in 12-hour format without AM/PM (progress bar conveys day/night), 24h progress bar, emoji weather icon, temperature in both units (e.g. `79°F/26°C`), short condition text
 - **Home zone**: Marked with `►`, entire row in green. All other zones in orange/amber
 - **Progress bar**: `▓` for elapsed, `░` for remaining. Width: 14 characters. Calculated as `(hours * 60 + minutes) / 1440 * bar_width`
 - **Footer**: Keybind hints and weather freshness timestamp
@@ -66,7 +66,7 @@ Note: Terminal "yellow" typically renders as orange/amber, which matches the des
 curl -s "wttr.in/Austin?format=%c+%t+%C"
 ```
 
-Returns: `☀️ +79°F Sunny`
+Returns emoji, temperature, and condition. Fetch both °F and °C (two requests or parse both from the response) and display as `79°F/26°C`.
 
 ### Weather Behavior
 
