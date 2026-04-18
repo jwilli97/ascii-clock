@@ -1,0 +1,11 @@
+{
+  "zones": [
+    {"name": "HAWAII", "tz": "Pacific/Honolulu", "city": "Hilo"},
+    {"name": "WEST COAST", "tz": "America/Los_Angeles", "city": "Los Angeles"},
+    {"name": "MOUNTAIN", "tz": "America/Denver", "city": "Denver"},
+    {"name": "CENTRAL", "tz": "America/Chicago", "city": "Austin", "home": true},
+    {"name": "EASTERN", "tz": "America/New_York", "city": "New York"},
+    {"name": "UTC", "tz": "UTC", "city": "London"}
+  ],
+  "refresh_minutes": 30
+}

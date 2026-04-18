@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""tz-clock — Terminal Timezone Dashboard"""
+
+import argparse
+import json
+import os
+from collections import namedtuple
+
+Zone = namedtuple("Zone", ["name", "tz", "city", "home"])
+
+DEFAULT_ZONES = [
+    Zone("HAWAII", "Pacific/Honolulu", "Hilo", False),
+    Zone("WEST COAST", "America/Los_Angeles", "Los Angeles", False),
+    Zone("MOUNTAIN", "America/Denver", "Denver", False),
+    Zone("CENTRAL", "America/Chicago", "Austin", True),
+    Zone("EASTERN", "America/New_York", "New York", False),
+    Zone("UTC", "UTC", "London", False),
+]
+
+DEFAULT_CONFIG_PATH = os.path.expanduser("~/.config/tz-clock/config.json")
+DEFAULT_REFRESH_MINUTES = 30
+
+
+def load_config(path):
+    """Load zones and settings from a JSON config file. Returns (zones, refresh_minutes) or raises FileNotFoundError."""
+    with open(path) as f:
+        data = json.load(f)
+    zones = []
+    for z in data.get("zones", []):
+        zones.append(Zone(
+            name=z["name"],
+            tz=z["tz"],
+            city=z["city"],
+            home=z.get("home", False),
+        ))
+    refresh = data.get("refresh_minutes", DEFAULT_REFRESH_MINUTES)
+    return zones, refresh
+
+
+def parse_args(argv=None):
+    """Parse CLI arguments. Returns argparse.Namespace."""
+    parser = argparse.ArgumentParser(description="Terminal Timezone Dashboard")
+    parser.add_argument("--config", default=None, help="Path to config file")
+    parser.add_argument("--no-weather", action="store_true", help="Disable weather")
+    parser.add_argument("--refresh", type=int, default=None, help="Weather refresh interval in minutes")
+    return parser.parse_args(argv)
+
+
+def resolve_config(args):
+    """Resolve zones and settings from defaults → config file → CLI args."""
+    zones = list(DEFAULT_ZONES)
+    refresh = DEFAULT_REFRESH_MINUTES
+
+    config_path = args.config or DEFAULT_CONFIG_PATH
+    try:
+        zones, refresh = load_config(config_path)
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        if args.config:
+            import sys
+            print(f"Warning: could not load config from {args.config}", file=sys.stderr)
+
+    if args.refresh is not None:
+        refresh = args.refresh
+
+    return zones, refresh, args.no_weather
