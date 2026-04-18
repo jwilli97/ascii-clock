@@ -110,3 +110,51 @@ def test_resolve_config_cli_overrides_file():
         assert refresh == 99
     finally:
         os.unlink(path)
+
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+def test_get_zone_time():
+    zone = Zone("CENTRAL", "America/Chicago", "Austin", True)
+    result = tz_clock.get_zone_time(zone)
+    assert "hour" in result
+    assert "minute" in result
+    assert "time_str" in result
+    assert "date_str" in result
+    assert "day_str" in result
+    assert 0 <= result["hour"] <= 23
+    assert 0 <= result["minute"] <= 59
+
+
+def test_get_zone_time_format():
+    zone = Zone("UTC", "UTC", "London", False)
+    result = tz_clock.get_zone_time(zone)
+    # time_str should be like "1:45" or "12:05" — no AM/PM
+    assert ":" in result["time_str"]
+    assert "AM" not in result["time_str"]
+    assert "PM" not in result["time_str"]
+
+
+def test_make_progress_bar_midnight():
+    bar = tz_clock.make_progress_bar(0, 0, width=14)
+    assert bar == "░" * 14
+
+
+def test_make_progress_bar_noon():
+    bar = tz_clock.make_progress_bar(12, 0, width=14)
+    assert bar == "▓" * 7 + "░" * 7
+
+
+def test_make_progress_bar_end_of_day():
+    bar = tz_clock.make_progress_bar(23, 59, width=14)
+    filled = round(((23 * 60 + 59) / 1440) * 14)
+    assert bar == "▓" * filled + "░" * (14 - filled)
+
+
+def test_make_progress_bar_custom_width():
+    bar = tz_clock.make_progress_bar(6, 0, width=24)
+    filled = round(((6 * 60) / 1440) * 24)
+    assert len(bar) == 24
+    assert bar == "▓" * filled + "░" * (24 - filled)

@@ -5,6 +5,8 @@ import argparse
 import json
 import os
 from collections import namedtuple
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 Zone = namedtuple("Zone", ["name", "tz", "city", "home"])
 
@@ -63,3 +65,25 @@ def resolve_config(args):
         refresh = args.refresh
 
     return zones, refresh, args.no_weather
+
+
+def get_zone_time(zone):
+    """Get current time info for a zone. Returns dict with hour, minute, time_str, date_str, day_str.
+    hour/minute are in 24h for progress bar. time_str is 12h without AM/PM."""
+    now = datetime.now(ZoneInfo(zone.tz))
+    hour_12 = now.hour % 12 or 12
+    return {
+        "hour": now.hour,
+        "minute": now.minute,
+        "time_str": f"{hour_12}:{now.minute:02d}",
+        "date_str": now.strftime("%b %d"),
+        "day_str": now.strftime("%A"),
+    }
+
+
+def make_progress_bar(hour_24, minute, width=14):
+    """Build a progress bar string showing position in the 24h day."""
+    total_minutes = hour_24 * 60 + minute
+    fraction = total_minutes / 1440
+    filled = round(fraction * width)
+    return "▓" * filled + "░" * (width - filled)
