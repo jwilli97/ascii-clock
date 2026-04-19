@@ -92,7 +92,7 @@ def make_progress_bar(hour_24, minute, width=14):
     total_minutes = hour_24 * 60 + minute
     fraction = total_minutes / 1440
     filled = round(fraction * width)
-    return "▓" * filled + "░" * (width - filled)
+    return "#" * filled + "-" * (width - filled)
 
 
 WEATHER_EMOJI = {
@@ -243,17 +243,6 @@ def format_footer(weather_age_seconds, inner_width=54):
     return pad_row(content, inner_width)
 
 
-# Box-drawing characters
-TOP_LEFT = "╔"
-TOP_RIGHT = "╗"
-BOT_LEFT = "╚"
-BOT_RIGHT = "╝"
-HORIZONTAL = "═"
-VERTICAL = "║"
-T_LEFT = "╠"
-T_RIGHT = "╣"
-
-
 def init_colors():
     """Initialize curses color pairs."""
     curses.start_color()
@@ -265,14 +254,34 @@ def init_colors():
     curses.init_pair(5, curses.COLOR_WHITE, -1)     # footer (dim)
 
 
+def draw_hline(stdscr, row, col, width, left_ch, right_ch, frame_attr):
+    """Draw a horizontal border line using ACS characters."""
+    stdscr.addch(row, col, left_ch, frame_attr)
+    stdscr.hline(row, col + 1, curses.ACS_HLINE, width)
+    try:
+        stdscr.addch(row, col + 1 + width, right_ch, frame_attr)
+    except curses.error:
+        pass
+
+
+def draw_text_row(stdscr, row, col, text, inner_width, text_attr, frame_attr):
+    """Draw a row with vertical borders and text content."""
+    stdscr.addch(row, col, curses.ACS_VLINE, frame_attr)
+    stdscr.addstr(row, col + 1, pad_row(text, inner_width)[:inner_width], text_attr)
+    try:
+        stdscr.addch(row, col + 1 + inner_width, curses.ACS_VLINE, frame_attr)
+    except curses.error:
+        pass
+
+
 def draw_dashboard(stdscr, zones, weather_data, weather_time, no_weather):
     """Draw the full dashboard. Called on every refresh."""
     stdscr.erase()
     height, width = stdscr.getmaxyx()
-    inner_width = width - 2  # space between ║ walls
+    inner_width = width - 2
 
     if width < 40 or height < len(zones) + 6:
-        msg = "Terminal too small — please resize"
+        msg = "Terminal too small -- please resize"
         stdscr.addstr(height // 2, max(0, (width - len(msg)) // 2), msg)
         stdscr.refresh()
         return
@@ -286,25 +295,18 @@ def draw_dashboard(stdscr, zones, weather_data, weather_time, no_weather):
     row = 0
 
     # Top border
-    top = TOP_LEFT + HORIZONTAL * inner_width + TOP_RIGHT
-    stdscr.addstr(row, 0, top[:width], frame)
+    draw_hline(stdscr, row, 0, inner_width, curses.ACS_ULCORNER, curses.ACS_URCORNER, frame)
     row += 1
 
     # Header
     home_zone = next((z for z in zones if z.home), zones[0])
     home_time = get_zone_time(home_zone)
     header_content = format_header(home_time["day_str"], home_time["date_str"], inner_width)
-    stdscr.addstr(row, 0, VERTICAL, frame)
-    stdscr.addstr(row, 1, header_content[:inner_width], title_color)
-    try:
-        stdscr.addstr(row, 1 + inner_width, VERTICAL, frame)
-    except curses.error:
-        pass
+    draw_text_row(stdscr, row, 0, header_content, inner_width, title_color, frame)
     row += 1
 
     # Header separator
-    sep = T_LEFT + HORIZONTAL * inner_width + T_RIGHT
-    stdscr.addstr(row, 0, sep[:width], frame)
+    draw_hline(stdscr, row, 0, inner_width, curses.ACS_LTEE, curses.ACS_RTEE, frame)
     row += 1
 
     # Zone rows
@@ -313,17 +315,11 @@ def draw_dashboard(stdscr, zones, weather_data, weather_time, no_weather):
         weather = weather_data.get(zone.name) if not no_weather else None
         content = format_zone_row(zone, time_info, weather, inner_width)
         color = home_color if zone.home else zone_color
-
-        stdscr.addstr(row, 0, VERTICAL, frame)
-        stdscr.addstr(row, 1, content[:inner_width], color)
-        try:
-            stdscr.addstr(row, 1 + inner_width, VERTICAL, frame)
-        except curses.error:
-            pass
+        draw_text_row(stdscr, row, 0, content, inner_width, color, frame)
         row += 1
 
     # Footer separator
-    stdscr.addstr(row, 0, sep[:width], frame)
+    draw_hline(stdscr, row, 0, inner_width, curses.ACS_LTEE, curses.ACS_RTEE, frame)
     row += 1
 
     # Footer
@@ -334,17 +330,11 @@ def draw_dashboard(stdscr, zones, weather_data, weather_time, no_weather):
     else:
         weather_age = time.time() - weather_time
     footer_content = format_footer(weather_age, inner_width)
-    stdscr.addstr(row, 0, VERTICAL, frame)
-    stdscr.addstr(row, 1, footer_content[:inner_width], footer_color)
-    try:
-        stdscr.addstr(row, 1 + inner_width, VERTICAL, frame)
-    except curses.error:
-        pass
+    draw_text_row(stdscr, row, 0, footer_content, inner_width, footer_color, frame)
     row += 1
 
     # Bottom border
-    bot = BOT_LEFT + HORIZONTAL * inner_width + BOT_RIGHT
-    stdscr.addstr(row, 0, bot[:width], frame)
+    draw_hline(stdscr, row, 0, inner_width, curses.ACS_LLCORNER, curses.ACS_LRCORNER, frame)
 
     stdscr.refresh()
 

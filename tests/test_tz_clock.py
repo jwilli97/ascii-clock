@@ -139,25 +139,25 @@ def test_get_zone_time_format():
 
 def test_make_progress_bar_midnight():
     bar = tz_clock.make_progress_bar(0, 0, width=14)
-    assert bar == "░" * 14
+    assert bar == "-" * 14
 
 
 def test_make_progress_bar_noon():
     bar = tz_clock.make_progress_bar(12, 0, width=14)
-    assert bar == "▓" * 7 + "░" * 7
+    assert bar == "#" * 7 + "-" * 7
 
 
 def test_make_progress_bar_end_of_day():
     bar = tz_clock.make_progress_bar(23, 59, width=14)
     filled = round(((23 * 60 + 59) / 1440) * 14)
-    assert bar == "▓" * filled + "░" * (14 - filled)
+    assert bar == "#" * filled + "-" * (14 - filled)
 
 
 def test_make_progress_bar_custom_width():
     bar = tz_clock.make_progress_bar(6, 0, width=24)
     filled = round(((6 * 60) / 1440) * 24)
     assert len(bar) == 24
-    assert bar == "▓" * filled + "░" * (24 - filled)
+    assert bar == "#" * filled + "-" * (24 - filled)
 
 
 import threading
@@ -241,7 +241,7 @@ def test_format_zone_row_home():
     assert "►" in row
     assert "CENTRAL" in row
     assert "6:45" in row
-    assert "▓" in row
+    assert "#" in row
     assert "79°F/26°C" in row
     assert len(row) == 54
 
