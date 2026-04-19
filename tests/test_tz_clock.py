@@ -259,7 +259,6 @@ def test_format_zone_row_non_home():
 
 def test_format_header():
     header = tz_clock.format_header("Friday", "Apr 18", inner_width=54)
-    assert "TIMEZONE DASHBOARD" in header
     assert "Friday" in header
     assert "Apr 18" in header
     assert len(header) == 54

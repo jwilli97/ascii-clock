@@ -4,11 +4,13 @@
 import argparse
 import curses
 import json
+import locale
 import os
 import threading
 import time
 from collections import namedtuple
 from datetime import datetime
+from urllib.parse import quote
 from urllib.request import urlopen, Request
 from zoneinfo import ZoneInfo
 
@@ -174,7 +176,7 @@ def format_weather(weather):
 def fetch_weather(city):
     """Fetch weather for a city from wttr.in. Returns parsed weather dict or None."""
     try:
-        url = f"https://wttr.in/{city}?format=j1"
+        url = f"https://wttr.in/{quote(city)}?format=j1"
         req = Request(url, headers={"User-Agent": "curl/7.0"})
         with urlopen(req, timeout=10) as resp:
             return parse_weather(resp.read().decode())
@@ -222,12 +224,7 @@ def format_zone_row(zone, time_info, weather, inner_width=54):
 
 def format_header(day_name, date_str, inner_width=54):
     """Format the header row content."""
-    left = "  TIMEZONE DASHBOARD"
-    right = f"{day_name}, {date_str}"
-    gap = inner_width - len(left) - len(right)
-    if gap < 1:
-        gap = 1
-    content = left + " " * gap + right
+    content = f"  {day_name}, {date_str}"
     return pad_row(content, inner_width)
 
 
@@ -413,6 +410,7 @@ def _refresh_weather(zones, weather_data, weather_lock):
 
 
 def main():
+    locale.setlocale(locale.LC_ALL, "")
     args = parse_args()
     zones, refresh_minutes, no_weather = resolve_config(args)
     curses.wrapper(lambda stdscr: main_loop(stdscr, zones, refresh_minutes, no_weather))
