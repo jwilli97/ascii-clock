@@ -2,6 +2,7 @@
 """tz-clock — Terminal Timezone Dashboard"""
 
 import argparse
+import curses
 import json
 import os
 import threading
@@ -243,3 +244,179 @@ def format_footer(weather_age_seconds, inner_width=54):
         gap = 1
     content = left + " " * gap + right
     return pad_row(content, inner_width)
+
+
+# Box-drawing characters
+TOP_LEFT = "╔"
+TOP_RIGHT = "╗"
+BOT_LEFT = "╚"
+BOT_RIGHT = "╝"
+HORIZONTAL = "═"
+VERTICAL = "║"
+T_LEFT = "╠"
+T_RIGHT = "╣"
+
+
+def init_colors():
+    """Initialize curses color pairs."""
+    curses.start_color()
+    curses.use_default_colors()
+    curses.init_pair(1, curses.COLOR_BLUE, -1)     # frame
+    curses.init_pair(2, curses.COLOR_WHITE, -1)     # title
+    curses.init_pair(3, curses.COLOR_GREEN, -1)     # home zone
+    curses.init_pair(4, curses.COLOR_YELLOW, -1)    # other zones
+    curses.init_pair(5, curses.COLOR_WHITE, -1)     # footer (dim)
+
+
+def draw_dashboard(stdscr, zones, weather_data, weather_time, no_weather):
+    """Draw the full dashboard. Called on every refresh."""
+    stdscr.erase()
+    height, width = stdscr.getmaxyx()
+    inner_width = width - 2  # space between ║ walls
+
+    if width < 40 or height < len(zones) + 6:
+        msg = "Terminal too small — please resize"
+        stdscr.addstr(height // 2, max(0, (width - len(msg)) // 2), msg)
+        stdscr.refresh()
+        return
+
+    frame = curses.color_pair(1)
+    title_color = curses.color_pair(2) | curses.A_BOLD
+    home_color = curses.color_pair(3)
+    zone_color = curses.color_pair(4)
+    footer_color = curses.color_pair(5) | curses.A_DIM
+
+    row = 0
+
+    # Top border
+    top = TOP_LEFT + HORIZONTAL * inner_width + TOP_RIGHT
+    stdscr.addstr(row, 0, top[:width], frame)
+    row += 1
+
+    # Header
+    home_zone = next((z for z in zones if z.home), zones[0])
+    home_time = get_zone_time(home_zone)
+    header_content = format_header(home_time["day_str"], home_time["date_str"], inner_width)
+    stdscr.addstr(row, 0, VERTICAL, frame)
+    stdscr.addstr(row, 1, header_content[:inner_width], title_color)
+    try:
+        stdscr.addstr(row, 1 + inner_width, VERTICAL, frame)
+    except curses.error:
+        pass
+    row += 1
+
+    # Header separator
+    sep = T_LEFT + HORIZONTAL * inner_width + T_RIGHT
+    stdscr.addstr(row, 0, sep[:width], frame)
+    row += 1
+
+    # Zone rows
+    for zone in zones:
+        time_info = get_zone_time(zone)
+        weather = weather_data.get(zone.name) if not no_weather else None
+        content = format_zone_row(zone, time_info, weather, inner_width)
+        color = home_color if zone.home else zone_color
+
+        stdscr.addstr(row, 0, VERTICAL, frame)
+        stdscr.addstr(row, 1, content[:inner_width], color)
+        try:
+            stdscr.addstr(row, 1 + inner_width, VERTICAL, frame)
+        except curses.error:
+            pass
+        row += 1
+
+    # Footer separator
+    stdscr.addstr(row, 0, sep[:width], frame)
+    row += 1
+
+    # Footer
+    if no_weather:
+        weather_age = None
+    elif weather_time is None:
+        weather_age = None
+    else:
+        weather_age = time.time() - weather_time
+    footer_content = format_footer(weather_age, inner_width)
+    stdscr.addstr(row, 0, VERTICAL, frame)
+    stdscr.addstr(row, 1, footer_content[:inner_width], footer_color)
+    try:
+        stdscr.addstr(row, 1 + inner_width, VERTICAL, frame)
+    except curses.error:
+        pass
+    row += 1
+
+    # Bottom border
+    bot = BOT_LEFT + HORIZONTAL * inner_width + BOT_RIGHT
+    stdscr.addstr(row, 0, bot[:width], frame)
+
+    stdscr.refresh()
+
+
+def main_loop(stdscr, zones, refresh_minutes, no_weather):
+    """Main curses event loop."""
+    curses.curs_set(0)
+    init_colors()
+    stdscr.timeout(1000)  # 1 second timeout for key polling
+
+    weather_data = {}
+    weather_lock = threading.Lock()
+    weather_time = None
+    last_minute = None
+
+    # Initial weather fetch
+    if not no_weather:
+        fetch_all_weather(zones, weather_data, weather_lock)
+        weather_time = time.time()
+
+    while True:
+        now = time.time()
+
+        # Auto-refresh weather
+        if not no_weather and weather_time and (now - weather_time) >= refresh_minutes * 60:
+            threading.Thread(
+                target=_refresh_weather,
+                args=(zones, weather_data, weather_lock),
+                daemon=True,
+            ).start()
+            weather_time = now
+
+        # Redraw on minute change or first draw
+        current_minute = int(now) // 60
+        if current_minute != last_minute:
+            with weather_lock:
+                draw_dashboard(stdscr, zones, dict(weather_data), weather_time, no_weather)
+            last_minute = current_minute
+
+        # Handle input
+        try:
+            key = stdscr.getch()
+        except curses.error:
+            key = -1
+
+        if key == ord("q"):
+            break
+        elif key == ord("r") and not no_weather:
+            threading.Thread(
+                target=_refresh_weather,
+                args=(zones, weather_data, weather_lock),
+                daemon=True,
+            ).start()
+            weather_time = time.time()
+            last_minute = None  # force redraw
+        elif key == curses.KEY_RESIZE:
+            last_minute = None  # force redraw on resize
+
+
+def _refresh_weather(zones, weather_data, weather_lock):
+    """Background weather refresh helper."""
+    fetch_all_weather(zones, weather_data, weather_lock)
+
+
+def main():
+    args = parse_args()
+    zones, refresh_minutes, no_weather = resolve_config(args)
+    curses.wrapper(lambda stdscr: main_loop(stdscr, zones, refresh_minutes, no_weather))
+
+
+if __name__ == "__main__":
+    main()
