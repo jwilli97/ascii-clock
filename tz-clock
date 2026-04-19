@@ -195,3 +195,51 @@ def fetch_all_weather(zones, results, lock):
         threads.append(t)
     for t in threads:
         t.join(timeout=15)
+
+
+BAR_WIDTH = 14
+
+
+def pad_row(text, width):
+    """Pad or truncate text to exact width."""
+    if len(text) > width:
+        return text[:width]
+    return text + " " * (width - len(text))
+
+
+def format_zone_row(zone, time_info, weather, inner_width=54):
+    """Format a single zone row (content between the ║ walls)."""
+    marker = " ►" if zone.home else "  "
+    name = pad_row(zone.name, 12)
+    time_str = f"{time_info['time_str']:>5}"
+    bar = make_progress_bar(time_info["hour"], time_info["minute"], BAR_WIDTH)
+    weather_str = format_weather(weather)
+
+    content = f"{marker}{name} {time_str}  {bar}  {weather_str}"
+    return pad_row(content, inner_width)
+
+
+def format_header(day_name, date_str, inner_width=54):
+    """Format the header row content."""
+    left = "  TIMEZONE DASHBOARD"
+    right = f"{day_name}, {date_str}"
+    gap = inner_width - len(left) - len(right)
+    if gap < 1:
+        gap = 1
+    content = left + " " * gap + right
+    return pad_row(content, inner_width)
+
+
+def format_footer(weather_age_seconds, inner_width=54):
+    """Format the footer row content."""
+    left = "  r: refresh weather   q: quit"
+    if weather_age_seconds is None:
+        right = "weather loading..."
+    else:
+        minutes_ago = int(weather_age_seconds // 60)
+        right = f"weather updated {minutes_ago}m ago"
+    gap = inner_width - len(left) - len(right)
+    if gap < 1:
+        gap = 1
+    content = left + " " * gap + right
+    return pad_row(content, inner_width)

@@ -220,3 +220,60 @@ def test_format_weather_string():
 def test_format_weather_none():
     result = tz_clock.format_weather(None)
     assert result == "--"
+
+
+def test_pad_row():
+    result = tz_clock.pad_row("hello", 20)
+    assert len(result) == 20
+    assert result == "hello" + " " * 15
+
+
+def test_pad_row_truncate():
+    result = tz_clock.pad_row("a" * 30, 20)
+    assert len(result) == 20
+
+
+def test_format_zone_row_home():
+    zone = Zone("CENTRAL", "America/Chicago", "Austin", True)
+    time_info = {"time_str": "6:45", "hour": 18, "minute": 45}
+    weather = {"emoji": "☀️", "temp_f": "79", "temp_c": "26", "condition": "Sunny"}
+    row = tz_clock.format_zone_row(zone, time_info, weather, inner_width=54)
+    assert "►" in row
+    assert "CENTRAL" in row
+    assert "6:45" in row
+    assert "▓" in row
+    assert "79°F/26°C" in row
+    assert len(row) == 54
+
+
+def test_format_zone_row_non_home():
+    zone = Zone("UTC", "UTC", "London", False)
+    time_info = {"time_str": "12:45", "hour": 0, "minute": 45}
+    weather = None
+    row = tz_clock.format_zone_row(zone, time_info, weather, inner_width=54)
+    assert "►" not in row
+    assert "UTC" in row
+    assert "--" in row
+    assert len(row) == 54
+
+
+def test_format_header():
+    header = tz_clock.format_header("Friday", "Apr 18", inner_width=54)
+    assert "TIMEZONE DASHBOARD" in header
+    assert "Friday" in header
+    assert "Apr 18" in header
+    assert len(header) == 54
+
+
+def test_format_footer():
+    footer = tz_clock.format_footer(120, inner_width=54)
+    assert "r: refresh" in footer
+    assert "q: quit" in footer
+    assert "2m ago" in footer
+    assert len(footer) == 54
+
+
+def test_format_footer_never_updated():
+    footer = tz_clock.format_footer(None, inner_width=54)
+    assert "loading" in footer.lower() or "--" in footer
+    assert len(footer) == 54
