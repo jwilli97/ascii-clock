@@ -158,3 +158,65 @@ def test_make_progress_bar_custom_width():
     filled = round(((6 * 60) / 1440) * 24)
     assert len(bar) == 24
     assert bar == "▓" * filled + "░" * (24 - filled)
+
+
+import threading
+
+
+def test_parse_weather_response_success():
+    sample_json = json.dumps({
+        "current_condition": [{
+            "temp_F": "79",
+            "temp_C": "26",
+            "weatherDesc": [{"value": "Sunny"}],
+            "weatherCode": "113",
+        }]
+    })
+    result = tz_clock.parse_weather(sample_json)
+    assert result["temp_f"] == "79"
+    assert result["temp_c"] == "26"
+    assert result["condition"] == "Sunny"
+    assert result["emoji"] is not None
+
+
+def test_parse_weather_response_unknown_code():
+    sample_json = json.dumps({
+        "current_condition": [{
+            "temp_F": "50",
+            "temp_C": "10",
+            "weatherDesc": [{"value": "Weird"}],
+            "weatherCode": "99999",
+        }]
+    })
+    result = tz_clock.parse_weather(sample_json)
+    assert result["temp_f"] == "50"
+    assert result["condition"] == "Weird"
+    assert result["emoji"] == "?"
+
+
+def test_parse_weather_bad_json():
+    result = tz_clock.parse_weather("not json")
+    assert result is None
+
+
+def test_weather_emoji_mapping():
+    # Sunny
+    assert tz_clock.WEATHER_EMOJI.get("113") == "☀️"
+    # Cloudy
+    assert tz_clock.WEATHER_EMOJI.get("119") == "☁️"
+    # Rain
+    assert tz_clock.WEATHER_EMOJI.get("296") == "🌧️"
+
+
+def test_format_weather_string():
+    weather = {"temp_f": "79", "temp_c": "26", "condition": "Sunny", "emoji": "☀️"}
+    result = tz_clock.format_weather(weather)
+    assert "79°F" in result
+    assert "26°C" in result
+    assert "☀️" in result
+    assert "Sunny" in result
+
+
+def test_format_weather_none():
+    result = tz_clock.format_weather(None)
+    assert result == "--"

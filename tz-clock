@@ -4,8 +4,11 @@
 import argparse
 import json
 import os
+import threading
+import time
 from collections import namedtuple
 from datetime import datetime
+from urllib.request import urlopen, Request
 from zoneinfo import ZoneInfo
 
 Zone = namedtuple("Zone", ["name", "tz", "city", "home"])
@@ -87,3 +90,108 @@ def make_progress_bar(hour_24, minute, width=14):
     fraction = total_minutes / 1440
     filled = round(fraction * width)
     return "▓" * filled + "░" * (width - filled)
+
+
+WEATHER_EMOJI = {
+    "113": "☀️",   # Sunny / Clear
+    "116": "⛅",   # Partly cloudy
+    "119": "☁️",   # Cloudy
+    "122": "☁️",   # Overcast
+    "143": "🌫️",  # Mist
+    "176": "🌦️",  # Patchy rain
+    "179": "🌨️",  # Patchy snow
+    "182": "🌧️",  # Patchy sleet
+    "200": "⛈️",   # Thundery outbreaks
+    "227": "❄️",   # Blowing snow
+    "230": "❄️",   # Blizzard
+    "248": "🌫️",  # Fog
+    "260": "🌫️",  # Freezing fog
+    "263": "🌦️",  # Patchy light drizzle
+    "266": "🌦️",  # Light drizzle
+    "281": "🌧️",  # Freezing drizzle
+    "284": "🌧️",  # Heavy freezing drizzle
+    "293": "🌦️",  # Patchy light rain
+    "296": "🌧️",  # Light rain
+    "299": "🌧️",  # Moderate rain at times
+    "302": "🌧️",  # Moderate rain
+    "305": "🌧️",  # Heavy rain at times
+    "308": "🌧️",  # Heavy rain
+    "311": "🌧️",  # Light freezing rain
+    "314": "🌧️",  # Moderate or heavy freezing rain
+    "317": "🌨️",  # Light sleet
+    "320": "🌨️",  # Moderate or heavy sleet
+    "323": "🌨️",  # Patchy light snow
+    "326": "🌨️",  # Light snow
+    "329": "❄️",   # Patchy moderate snow
+    "332": "❄️",   # Moderate snow
+    "335": "❄️",   # Patchy heavy snow
+    "338": "❄️",   # Heavy snow
+    "350": "🌧️",  # Ice pellets
+    "353": "🌦️",  # Light rain shower
+    "356": "🌧️",  # Moderate or heavy rain shower
+    "359": "🌧️",  # Torrential rain shower
+    "362": "🌨️",  # Light sleet showers
+    "365": "🌨️",  # Moderate or heavy sleet showers
+    "368": "🌨️",  # Light snow showers
+    "371": "❄️",   # Moderate or heavy snow showers
+    "374": "🌧️",  # Light showers of ice pellets
+    "377": "🌧️",  # Moderate or heavy showers of ice pellets
+    "386": "⛈️",   # Patchy light rain with thunder
+    "389": "⛈️",   # Moderate or heavy rain with thunder
+    "392": "⛈️",   # Patchy light snow with thunder
+    "395": "⛈️",   # Moderate or heavy snow with thunder
+}
+
+# Night clear emoji — used when weatherCode is 113 and local hour is before 6 or after 18
+NIGHT_CLEAR_EMOJI = "🌙"
+
+
+def parse_weather(json_str):
+    """Parse wttr.in JSON response. Returns dict with temp_f, temp_c, condition, emoji or None on failure."""
+    try:
+        data = json.loads(json_str)
+        cc = data["current_condition"][0]
+        code = cc["weatherCode"]
+        emoji = WEATHER_EMOJI.get(code, "?")
+        return {
+            "temp_f": cc["temp_F"],
+            "temp_c": cc["temp_C"],
+            "condition": cc["weatherDesc"][0]["value"],
+            "emoji": emoji,
+        }
+    except (json.JSONDecodeError, KeyError, IndexError):
+        return None
+
+
+def format_weather(weather):
+    """Format weather dict into display string like '☀️  79°F/26°C Sunny'. Returns '--' if None."""
+    if weather is None:
+        return "--"
+    return f"{weather['emoji']}  {weather['temp_f']}°F/{weather['temp_c']}°C {weather['condition']}"
+
+
+def fetch_weather(city):
+    """Fetch weather for a city from wttr.in. Returns parsed weather dict or None."""
+    try:
+        url = f"https://wttr.in/{city}?format=j1"
+        req = Request(url, headers={"User-Agent": "curl/7.0"})
+        with urlopen(req, timeout=10) as resp:
+            return parse_weather(resp.read().decode())
+    except Exception:
+        return None
+
+
+def fetch_all_weather(zones, results, lock):
+    """Fetch weather for all zones in parallel threads. Updates results dict with lock."""
+    def worker(zone):
+        weather = fetch_weather(zone.city)
+        with lock:
+            results[zone.name] = weather
+
+    threads = []
+    for zone in zones:
+        t = threading.Thread(target=worker, args=(zone,), daemon=True)
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join(timeout=15)
